@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use futures::Future;
 use hyper::client::Connect;
 use ruma_client::{Client, Error};
-use ruma_client_api::r0;
+use ruma_client::api::r0;
 // use ruma_client_api::r0::membership::join_room_by_id;
 // use ruma_client_api::r0::send::send_message_event;
 // use ruma_client_api::r0::sync::sync_events;
@@ -48,7 +48,7 @@ fn run<'a, C: Connect>(conn: &'a Client<C>)
                     for room in response.rooms.invite.keys() {
                         join_room_by_id::call(conn,
                                               join_room_by_id::Request {
-                                                  room_id: room,
+                                                  room_id: room.clone(),
                                                   third_party_signed: None,
                                               })
                             .and_then(|response| {
