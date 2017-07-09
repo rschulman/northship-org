@@ -6,9 +6,10 @@ authors = ["Ross Schulman <ross@rbs.io>"]
 [dependencies]
 futures = "0.1.14"
 hyper = "0.11"
+hyper-tls = "0.1.2"
 ruma-identifiers = "0.11.0"
 ruma-events = "0.9.0"
-ruma-client-api = "0.1.0"
+ruma-api = "0.4.0"
 serde = "1.0.2"
 serde_json = "1.0.1"
 serde_urlencoded = "0.4.3"
@@ -17,13 +18,10 @@ url = "1.4.0"
 #diesel = { version = "0.13.0", features = ["postgres"] }
 #diesel_codegen = { version = "0.13.0", features = ["postgres"] }
 
-[dependencies.hyper-tls]
-git = "https://github.com/hyperium/hyper-tls"
-rev = "52f39a2635e90b0c04e37e98b8b959bd6780c34b"
-
-[dependencies.ruma-api]
-git = "https://github.com/ruma/ruma-api"
-
 [dependencies.ruma-client]
-git = "https://github.com/rschulman/ruma-client"
-branch = "master"
+git = "https://github.com/jplatte/ruma-client"
+branch = "room_id-workaround"
+
+[dependencies.ruma-client-api]
+git = "https://github.com/jplatte/ruma-client-api"
+branch = "room_id-workaround"
