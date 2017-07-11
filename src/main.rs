@@ -44,8 +44,8 @@ fn db_connect() -> SqliteConnection {
 
 fn new_todo(conn: &SqliteConnection,
             content: String,
-            deadline: Option<String>,
-            scheduled: Option<String>,
+            deadline: Option<&str>,
+            scheduled: Option<&str>,
             effort: Option<i32>,
             room: String)
             -> Result<(), Error> {
@@ -56,10 +56,14 @@ fn new_todo(conn: &SqliteConnection,
         deadline: deadline,
         scheduled: scheduled,
         effort: effort,
-        room: room,
+        room: &room,
     };
 
-    diesel::insert(&obligation).into(todos::table).get_results(conn).expect("Error saving new todo")
+    diesel::insert(&obligation)
+        .into(todos::table)
+        .execute(conn)
+        .expect("Error saving new todo");
+    Ok(())
 }
 
 struct Northship {
@@ -67,7 +71,7 @@ struct Northship {
 }
 
 
-
+/*
 fn run<'a, C: Connect>(conn: &'a Client<C>)
                        -> impl Future<Item = (), Error = ruma_client::Error> + 'a {
     use r0::sync::sync_events;
@@ -113,16 +117,17 @@ fn run<'a, C: Connect>(conn: &'a Client<C>)
     }
     futures::done(Ok(()))
 }
+*/
 
 fn main() {
     let dbc = db_connect();
 
     new_todo(&dbc,
-             "Solve world hunger",
+             "Solve world hunger".to_string(),
              Some("2017-07-10"),
              Some("2017-07-10 20:00:00"),
              None,
-             "roomids");
+             "roomids".to_string());
     // let mut core = Core::new().unwrap();
     // let handle = core.handle();
     // let server = Url::parse("https://matrix.westwork.org/").unwrap();

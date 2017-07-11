@@ -13,9 +13,9 @@ pub struct Todo {
 #[derive(Insertable)]
 #[table_name="todos"]
 pub struct NewTodo<'a> {
-    content: &'a str,
-    deadline: &'a Option<&'a str>,
-    scheduled: &'a Option<&'a str>,
-    effort: &'a Option<i32>,
-    room: &'a str,
+    pub content: &'a str,
+    pub deadline: Option<&'a str>,
+    pub scheduled: Option<&'a str>,
+    pub effort: Option<i32>,
+    pub room: &'a str,
 }
