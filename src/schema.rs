@@ -1,0 +1,1 @@
+infer_schema!("/home/ross/.config/northship/northship.db");

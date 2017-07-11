@@ -2,6 +2,10 @@
 #![feature(try_from)]
 #![feature(conservative_impl_trait)]
 
+#[macro_use]
+extern crate diesel;
+#[macro_use]
+extern crate diesel_codegen;
 extern crate futures;
 extern crate hyper;
 extern crate ruma_client;
@@ -11,21 +15,58 @@ extern crate ruma_identifiers;
 extern crate tokio_core;
 extern crate url;
 
+
 use std::convert::TryFrom;
 use std::collections::HashMap;
 
+use diesel::prelude::*;
+use diesel::sqlite;
+use diesel::sqlite::SqliteConnection;
 use futures::Future;
 use hyper::client::Connect;
 use ruma_client::{Client, Error};
 use ruma_client::api::r0;
-// use ruma_client_api::r0::membership::join_room_by_id;
-// use ruma_client_api::r0::send::send_message_event;
-// use ruma_client_api::r0::sync::sync_events;
 use ruma_events::EventType;
 use ruma_events::room::message::{MessageEventContent, MessageType, TextMessageEventContent};
 use ruma_identifiers::RoomAliasId;
 use tokio_core::reactor::Core;
 use url::Url;
+
+mod models;
+mod schema;
+
+use self::models::{Todo, NewTodo};
+
+fn db_connect() -> SqliteConnection {
+    let db_url = "/home/ross/.config/northship/northship.db";
+    SqliteConnection::establish(&db_url).expect("Failure connecting to database.")
+}
+
+fn new_todo(conn: &SqliteConnection,
+            content: String,
+            deadline: Option<String>,
+            scheduled: Option<String>,
+            effort: Option<i32>,
+            room: String)
+            -> Result<(), Error> {
+    use schema::todos;
+
+    let obligation = NewTodo {
+        content: &content,
+        deadline: deadline,
+        scheduled: scheduled,
+        effort: effort,
+        room: room,
+    };
+
+    diesel::insert(&obligation).into(todos::table).get_results(conn).expect("Error saving new todo")
+}
+
+struct Northship {
+    database: SqliteConnection,
+}
+
+
 
 fn run<'a, C: Connect>(conn: &'a Client<C>)
                        -> impl Future<Item = (), Error = ruma_client::Error> + 'a {
@@ -74,13 +115,21 @@ fn run<'a, C: Connect>(conn: &'a Client<C>)
 }
 
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let server = Url::parse("https://matrix.westwork.org/").unwrap();
+    let dbc = db_connect();
 
-    let mut client = Client::new(&handle, server);
+    new_todo(&dbc,
+             "Solve world hunger",
+             Some("2017-07-10"),
+             Some("2017-07-10 20:00:00"),
+             None,
+             "roomids");
+    // let mut core = Core::new().unwrap();
+    // let handle = core.handle();
+    // let server = Url::parse("https://matrix.westwork.org/").unwrap();
 
-    core.run(client.login("northship".to_string(), "thisisapass".to_string())
-            .and_then(run(&client)))
-        .unwrap();
+    // let mut client = Client::new(&handle, server);
+
+    // core.run(client.login("northship".to_string(), "thisisapass".to_string())
+    //         .and_then(run(&client)))
+    //     .unwrap();
 }
