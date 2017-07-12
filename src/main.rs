@@ -18,6 +18,7 @@ extern crate url;
 
 use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::cmp::max;
 
 use diesel::prelude::*;
 use diesel::sqlite;
@@ -64,6 +65,59 @@ fn new_todo(conn: &SqliteConnection,
         .execute(conn)
         .expect("Error saving new todo");
     Ok(())
+}
+
+fn format_todos(conn: &SqliteConnection, results: Vec<Todo>) -> Option<String> {
+    use schema::todos::dsl::*;
+
+    let mut maxes = vec![0, 0, 0];
+    for todo in results.iter() {
+        maxes[0] = max(todo.content.len(), maxes[0]);
+        match todo.deadline {
+            Some(ref item) => maxes[1] = max(item.len(), maxes[1]),
+            None => {}
+        }
+        match todo.scheduled {
+            Some(ref item) => maxes[2] = max(item.len(), maxes[2]),
+            None => {}
+        }
+    }
+
+    let mut formatted_results: String = String::new();
+    formatted_results.push_str(&format!("| #|{todo_title: ^widtha$}|{dead_title: ^widthb$}|{sched_title: \
+                                ^widthc$}|{eff_title:^4}|\n|{rule:-<widthd$}|\n",
+                               todo_title = "TODOs",
+                               widtha = maxes[0] + 2,
+                               dead_title = "Deadline",
+                               widthb = maxes[1] + 2,
+                               sched_title = "Scheduled",
+                               widthc = maxes[2] + 2,
+                               eff_title = "Effort",
+                               rule = "",
+                               widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
+    for (index, todo) in results.iter().enumerate() {
+        formatted_results.push_str(&format!("|{number:>2}|{the_todo: ^widtha$}|{dead: ^widthb$}|{sched: ^widthc$}|{eff:>6}|\n|{rule:-<widthd$}|\n",
+                                            number = &(index + 1).to_string(),
+                                            the_todo = &todo.content,
+                                            widtha = maxes[0] + 2,
+                                            dead = match &todo.deadline {
+                                                &Some(ref duedate) => &duedate,
+                                                &None => "          ",
+                                            },
+                                            widthb = maxes[1] + 2,
+                                            sched = match &todo.scheduled {
+                                                &Some(ref scheddate) => &scheddate,
+                                                &None => "                   ",
+                                            },
+                                            widthc = maxes[2] + 2,
+                                            eff = match &todo.effort {
+                                                &Some(ref minutes) => minutes.to_string(),
+                                                &None => "   ".to_string(),
+                                            },
+                                            rule = "",
+                                            widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
+    }
+    Some(formatted_results)
 }
 
 struct Northship {
@@ -120,6 +174,7 @@ fn run<'a, C: Connect>(conn: &'a Client<C>)
 */
 
 fn main() {
+    use schema::todos::dsl::*;
     let dbc = db_connect();
 
     new_todo(&dbc,
@@ -128,6 +183,18 @@ fn main() {
              Some("2017-07-10 20:00:00"),
              None,
              "roomids".to_string());
+    new_todo(&dbc,
+             "Fix the refrigerator and dryer".to_string(),
+             Some("2017-07-31"),
+             None,
+             Some(90),
+             "roomids".to_string());
+
+    let results = todos.filter(room.eq("roomids"))
+        .limit(20)
+        .load::<Todo>(&dbc)
+        .expect("Error loading Todos");
+    println!("{}", format_todos(&dbc, results).unwrap());
     // let mut core = Core::new().unwrap();
     // let handle = core.handle();
     // let server = Url::parse("https://matrix.westwork.org/").unwrap();
