@@ -17,6 +17,7 @@ tokio-core = "0.1.6"
 url = "1.4.0"
 diesel = { version = "0.13.0", features = ["sqlite"] }
 diesel_codegen = { version = "0.13.0", features = ["sqlite"] }
+chrono = "0.4.0"
 
 [dependencies.ruma-client]
 git = "https://github.com/jplatte/ruma-client"

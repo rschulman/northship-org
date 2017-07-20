@@ -14,6 +14,7 @@ extern crate ruma_events;
 extern crate ruma_identifiers;
 extern crate tokio_core;
 extern crate url;
+extern crate chrono;
 
 
 use std::convert::TryFrom;
@@ -64,6 +65,25 @@ fn new_todo(conn: &SqliteConnection,
         .into(todos::table)
         .execute(conn)
         .expect("Error saving new todo");
+    Ok(())
+}
+
+fn set_deadline(conn: &SqliteConnection, cmd: Vec<String>) -> Result<(), Error> {
+    let which_todo = match cmd[1].to_string() {
+        Ok(number) => number,
+        Err(error) => return error,
+    };
+    let db_todo = self.mapping[which_todo - 1];
+    let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
+        Ok(parsed) => parsed,
+        Err(error) => return error,
+    };
+
+    let updated = diesel::update(todos.find(db_todo))
+        .set(deadline.eq(be_done.to_string()))
+        .get_result::<Todo>(&conn)
+        .expect(&format!("Unable to find todo {}", db_todo));
+
     Ok(())
 }
 
@@ -120,8 +140,23 @@ fn format_todos(conn: &SqliteConnection, results: Vec<Todo>) -> Option<String> {
     Some(formatted_results)
 }
 
+fn parse_cmd(conn: &SqliteConnection, input: String) -> Result<String, Error> {
+    let words = input.split_whitespace();
+    let matches = testset.matches(words.nth(0));
+
+    match matches.matched(0) {
+        "todo" | "TODO" => parse_todo(matches),
+        "done" => mark_done(matches),
+        "deadline" => set_deadline(conn, matches),
+        "schedule" => set_schedule(matches),
+        "list" => Ok(format_todos(conn)),
+        "agenda" => format_agenda(conn),
+    }
+}
+
 struct Northship {
     database: SqliteConnection,
+    mapping: Vec<u32>,
 }
 
 
