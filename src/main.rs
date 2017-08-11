@@ -44,67 +44,53 @@ fn db_connect() -> SqliteConnection {
     SqliteConnection::establish(&db_url).expect("Failure connecting to database.")
 }
 
-fn new_todo(conn: &SqliteConnection,
-            content: String,
-            deadline: Option<&str>,
-            scheduled: Option<&str>,
-            effort: Option<i32>,
-            room: String)
-            -> Result<(), Error> {
-    use schema::todos;
-
-    let obligation = NewTodo {
-        content: &content,
-        deadline: deadline,
-        scheduled: scheduled,
-        effort: effort,
-        room: &room,
-    };
-
-    diesel::insert(&obligation)
-        .into(todos::table)
-        .execute(conn)
-        .expect("Error saving new todo");
-    Ok(())
+struct Northship {
+    database: SqliteConnection,
+    mapping: Vec<u32>,
 }
 
-fn set_deadline(conn: &SqliteConnection, cmd: Vec<String>) -> Result<(), Error> {
-    let which_todo = match cmd[1].to_string() {
-        Ok(number) => number,
-        Err(error) => return error,
-    };
-    let db_todo = self.mapping[which_todo - 1];
-    let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
-        Ok(parsed) => parsed,
-        Err(error) => return error,
-    };
+impl Northship {
+    fn parse_todo(&self, cmd: Vec<String>) -> Result<String, Error> {
+        let dead_pos = cmd.iter().position(|&x| x == "DEADLINE".to_string());
+        let sched_pos = cmd.iter().position(|&x| x == "SCHEDULE".to_string());
+    }
 
-    let updated = diesel::update(todos.find(db_todo))
-        .set(deadline.eq(be_done.to_string()))
-        .get_result::<Todo>(&conn)
-        .expect(&format!("Unable to find todo {}", db_todo));
+    fn parse_cmd(&self, input: String) -> Result<String, Error> {
+        let words = input.split_whitespace();
+        let matches = testset.matches(words.nth(0));
 
-    Ok(())
-}
-
-fn format_todos(conn: &SqliteConnection, results: Vec<Todo>) -> Option<String> {
-    use schema::todos::dsl::*;
-
-    let mut maxes = vec![0, 0, 0];
-    for todo in results.iter() {
-        maxes[0] = max(todo.content.len(), maxes[0]);
-        match todo.deadline {
-            Some(ref item) => maxes[1] = max(item.len(), maxes[1]),
-            None => {}
-        }
-        match todo.scheduled {
-            Some(ref item) => maxes[2] = max(item.len(), maxes[2]),
-            None => {}
+        match matches.matched(0) {
+            "todo" | "TODO" => self.parse_todo(matches),
+            "done" => self.mark_done(matches),
+            "deadline" => self.set_deadline(conn, matches),
+            "schedule" => self.set_schedule(matches),
+            "list" => Ok(self.format_todos(conn)),
+            "agenda" => self.format_agenda(conn),
         }
     }
 
-    let mut formatted_results: String = String::new();
-    formatted_results.push_str(&format!("| #|{todo_title: ^widtha$}|{dead_title: ^widthb$}|{sched_title: \
+    fn format_todos(&self) -> Result<String, Error> {
+        use schema::todos::dsl::*;
+        let results = todos.filter(room.eq("roomids"))
+        .limit(20)
+        .load::<Todo>(self.&database)
+        .expect("Error loading Todos");
+ 
+        let mut maxes = vec![0, 0, 0];
+        for todo in results.iter() {
+            maxes[0] = max(todo.content.len(), maxes[0]);
+            match todo.deadline {
+                Some(ref item) => maxes[1] = max(item.len(), maxes[1]),
+                None => {}
+            }
+            match todo.scheduled {
+                Some(ref item) => maxes[2] = max(item.len(), maxes[2]),
+                None => {}
+            }
+        }
+
+        let mut formatted_results: String = String::new();
+        formatted_results.push_str(&format!("| #|{todo_title: ^widtha$}|{dead_title: ^widthb$}|{sched_title: \
                                 ^widthc$}|{eff_title:^4}|\n|{rule:-<widthd$}|\n",
                                todo_title = "TODOs",
                                widtha = maxes[0] + 2,
@@ -115,8 +101,8 @@ fn format_todos(conn: &SqliteConnection, results: Vec<Todo>) -> Option<String> {
                                eff_title = "Effort",
                                rule = "",
                                widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
-    for (index, todo) in results.iter().enumerate() {
-        formatted_results.push_str(&format!("|{number:>2}|{the_todo: ^widtha$}|{dead: ^widthb$}|{sched: ^widthc$}|{eff:>6}|\n|{rule:-<widthd$}|\n",
+        for (index, todo) in results.iter().enumerate() {
+            formatted_results.push_str(&format!("|{number:>2}|{the_todo: ^widtha$}|{dead: ^widthb$}|{sched: ^widthc$}|{eff:>6}|\n|{rule:-<widthd$}|\n",
                                             number = &(index + 1).to_string(),
                                             the_todo = &todo.content,
                                             widtha = maxes[0] + 2,
@@ -136,27 +122,52 @@ fn format_todos(conn: &SqliteConnection, results: Vec<Todo>) -> Option<String> {
                                             },
                                             rule = "",
                                             widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
+        }
+        Ok(formatted_results)
     }
-    Some(formatted_results)
-}
 
-fn parse_cmd(conn: &SqliteConnection, input: String) -> Result<String, Error> {
-    let words = input.split_whitespace();
-    let matches = testset.matches(words.nth(0));
+    fn set_deadline(&self, cmd: Vec<String>) -> Result<(), Error> {
+        let which_todo = match cmd[1].to_string() {
+            Ok(number) => number,
+            Err(error) => return error,
+        };
+        let db_todo = self.mapping[which_todo - 1];
+        let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
+            Ok(parsed) => parsed,
+            Err(error) => return error,
+        };
 
-    match matches.matched(0) {
-        "todo" | "TODO" => parse_todo(matches),
-        "done" => mark_done(matches),
-        "deadline" => set_deadline(conn, matches),
-        "schedule" => set_schedule(matches),
-        "list" => Ok(format_todos(conn)),
-        "agenda" => format_agenda(conn),
+        let updated = diesel::update(todos.find(db_todo))
+            .set(deadline.eq(be_done.to_string()))
+            .get_result::<Todo>(self.&database)
+            .expect(&format!("Unable to find todo {}", db_todo));
+
+        Ok(())
     }
-}
 
-struct Northship {
-    database: SqliteConnection,
-    mapping: Vec<u32>,
+    fn new_todo(conn: &SqliteConnection,
+                content: String,
+                deadline: Option<&str>,
+                scheduled: Option<&str>,
+                effort: Option<i32>,
+                room: String)
+                -> Result<(), Error> {
+        use schema::todos;
+
+        let obligation = NewTodo {
+            content: &content,
+            deadline: deadline,
+            scheduled: scheduled,
+            effort: effort,
+            room: &room,
+        };
+
+        diesel::insert(&obligation)
+            .into(todos::table)
+            .execute(conn)
+            .expect("Error saving new todo");
+        Ok(())
+    }
 }
 
 
@@ -225,11 +236,7 @@ fn main() {
              Some(90),
              "roomids".to_string());
 
-    let results = todos.filter(room.eq("roomids"))
-        .limit(20)
-        .load::<Todo>(&dbc)
-        .expect("Error loading Todos");
-    println!("{}", format_todos(&dbc, results).unwrap());
+   println!("{}", format_todos(&dbc, results).unwrap());
     // let mut core = Core::new().unwrap();
     // let handle = core.handle();
     // let server = Url::parse("https://matrix.westwork.org/").unwrap();
