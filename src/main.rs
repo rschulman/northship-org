@@ -51,8 +51,12 @@ struct Northship {
 
 impl Northship {
     fn parse_todo(&self, cmd: Vec<String>) -> Result<String, Error> {
-        let dead_pos = cmd.iter().position(|&x| x == "DEADLINE".to_string());
-        let sched_pos = cmd.iter().position(|&x| x == "SCHEDULE".to_string());
+        let tokens = cmd.split_whitespace();
+        let deadpos = tokens.position(|&word| word == "DEADLINE");
+        let schedpos = tokens.position(|&word| word == "SCHEDULED");
+
+//        let content = tokens.take_while(|&word| word != "DEADLINE" && word != "SCHEDULED").skip(1).collect::<Vec<&str>>().join(" ");
+//        let deadline = tokens.skip(content.len() + 1).take_while(|&word| word != "SCHEDULED").collection::<Vec<&str>>().join(" ");
     }
 
     fn parse_cmd(&self, input: String) -> Result<String, Error> {
@@ -145,7 +149,7 @@ impl Northship {
         Ok(())
     }
 
-    fn new_todo(conn: &SqliteConnection,
+    fn new_todo(&self,
                 content: String,
                 deadline: Option<&str>,
                 scheduled: Option<&str>,
@@ -164,7 +168,7 @@ impl Northship {
 
         diesel::insert(&obligation)
             .into(todos::table)
-            .execute(conn)
+            .execute(self.&database)
             .expect("Error saving new todo");
         Ok(())
     }
@@ -246,4 +250,15 @@ fn main() {
     // core.run(client.login("northship".to_string(), "thisisapass".to_string())
     //         .and_then(run(&client)))
     //     .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn just_todo() {
+        let test_string = "TODO go to the grocery store";
+
+    }
 }
