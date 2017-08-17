@@ -6,6 +6,8 @@
 extern crate diesel;
 #[macro_use]
 extern crate diesel_codegen;
+#[macro_use]
+extern crate nom;
 extern crate futures;
 extern crate hyper;
 extern crate ruma_client;
@@ -20,6 +22,7 @@ extern crate chrono;
 use std::convert::TryFrom;
 use std::collections::HashMap;
 use std::cmp::max;
+use std::num::ParseIntError;
 
 use diesel::prelude::*;
 use diesel::sqlite;
@@ -33,6 +36,7 @@ use ruma_events::room::message::{MessageEventContent, MessageType, TextMessageEv
 use ruma_identifiers::RoomAliasId;
 use tokio_core::reactor::Core;
 use url::Url;
+use chrono::{DateTime, FixedOffset};
 
 mod models;
 mod schema;
@@ -46,40 +50,43 @@ fn db_connect() -> SqliteConnection {
 
 struct Northship {
     database: SqliteConnection,
-    mapping: Vec<u32>,
+    mapping: Vec<i32>,
 }
 
 impl Northship {
-    fn parse_todo(&self, cmd: Vec<String>) -> Result<String, Error> {
-        let tokens = cmd.split_whitespace();
+    /*   fn parse_todo(&self, cmd: Vec<String>) -> Result<String, Error> {
+        /*        let tokens = cmd.split_whitespace();
         let deadpos = tokens.position(|&word| word == "DEADLINE");
         let schedpos = tokens.position(|&word| word == "SCHEDULED");
 
-//        let content = tokens.take_while(|&word| word != "DEADLINE" && word != "SCHEDULED").skip(1).collect::<Vec<&str>>().join(" ");
-//        let deadline = tokens.skip(content.len() + 1).take_while(|&word| word != "SCHEDULED").collection::<Vec<&str>>().join(" ");
+        //        let content = tokens.take_while(|&word| word != "DEADLINE" && word != "SCHEDULED").skip(1).collect::<Vec<&str>>().join(" ");
+        //        let deadline = tokens.skip(content.len() + 1).take_while(|&word| word != "SCHEDULED").collection::<Vec<&str>>().join(" ");
+        */
+        Err(ruma_client::Error::AuthenticationRequired)
     }
 
     fn parse_cmd(&self, input: String) -> Result<String, Error> {
         let words = input.split_whitespace();
-        let matches = testset.matches(words.nth(0));
+        //let matches = words.iter().matches(words.nth(0));
 
-        match matches.matched(0) {
-            "todo" | "TODO" => self.parse_todo(matches),
-            "done" => self.mark_done(matches),
-            "deadline" => self.set_deadline(conn, matches),
-            "schedule" => self.set_schedule(matches),
-            "list" => Ok(self.format_todos(conn)),
-            "agenda" => self.format_agenda(conn),
+        match words.nth(0).unwrap() {
+            "todo" | "TODO" => self.parse_todo(words.collect()),
+            //            "done" => self.mark_done(matches),
+            "deadline" => self.set_deadline(words.collect()),
+            "schedule" => self.set_schedule(words.collect()),
+            "list" => Ok(self.format_todos()),
+            "agenda" => self.format_agenda(),
         }
     }
+    */
 
     fn format_todos(&self) -> Result<String, Error> {
         use schema::todos::dsl::*;
         let results = todos.filter(room.eq("roomids"))
-        .limit(20)
-        .load::<Todo>(self.&database)
-        .expect("Error loading Todos");
- 
+            .limit(20)
+            .load::<Todo>(&self.database)
+            .expect("Error loading Todos");
+
         let mut maxes = vec![0, 0, 0];
         for todo in results.iter() {
             maxes[0] = max(todo.content.len(), maxes[0]);
@@ -130,20 +137,22 @@ impl Northship {
         Ok(formatted_results)
     }
 
-    fn set_deadline(&self, cmd: Vec<String>) -> Result<(), Error> {
-        let which_todo = match cmd[1].to_string() {
+    fn set_deadline(&self, cmd: Vec<String>) -> Result<(), String> {
+        use schema::todos::dsl::{todos, deadline};
+
+        let which_todo: usize = match cmd[1].parse() {
             Ok(number) => number,
-            Err(error) => return error,
+            Err(error) => return Err("Couldn't parse.".to_owned()),
         };
         let db_todo = self.mapping[which_todo - 1];
         let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
             Ok(parsed) => parsed,
-            Err(error) => return error,
+            Err(error) => return Err("Bad date.".to_owned()),
         };
 
         let updated = diesel::update(todos.find(db_todo))
             .set(deadline.eq(be_done.to_string()))
-            .get_result::<Todo>(self.&database)
+            .execute(&self.database)
             .expect(&format!("Unable to find todo {}", db_todo));
 
         Ok(())
@@ -168,7 +177,7 @@ impl Northship {
 
         diesel::insert(&obligation)
             .into(todos::table)
-            .execute(self.&database)
+            .execute(&self.database)
             .expect("Error saving new todo");
         Ok(())
     }
@@ -226,21 +235,23 @@ fn run<'a, C: Connect>(conn: &'a Client<C>)
 fn main() {
     use schema::todos::dsl::*;
     let dbc = db_connect();
+    let host = Northship {
+        database: dbc,
+        mapping: vec![0, 0],
+    };
 
-    new_todo(&dbc,
-             "Solve world hunger".to_string(),
-             Some("2017-07-10"),
-             Some("2017-07-10 20:00:00"),
-             None,
-             "roomids".to_string());
-    new_todo(&dbc,
-             "Fix the refrigerator and dryer".to_string(),
-             Some("2017-07-31"),
-             None,
-             Some(90),
-             "roomids".to_string());
+    host.new_todo("Solve world hunger".to_string(),
+                  Some("2017-07-10"),
+                  Some("2017-07-10 20:00:00"),
+                  None,
+                  "roomids".to_string());
+    host.new_todo("Fix the refrigerator and dryer".to_string(),
+                  Some("2017-07-31"),
+                  None,
+                  Some(90),
+                  "roomids".to_string());
 
-   println!("{}", format_todos(&dbc, results).unwrap());
+    println!("{}", host.format_todos().unwrap());
     // let mut core = Core::new().unwrap();
     // let handle = core.handle();
     // let server = Url::parse("https://matrix.westwork.org/").unwrap();
@@ -250,15 +261,4 @@ fn main() {
     // core.run(client.login("northship".to_string(), "thisisapass".to_string())
     //         .and_then(run(&client)))
     //     .unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn just_todo() {
-        let test_string = "TODO go to the grocery store";
-
-    }
 }
