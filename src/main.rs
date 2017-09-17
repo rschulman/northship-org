@@ -40,6 +40,7 @@ use chrono::{DateTime, FixedOffset};
 
 mod models;
 mod schema;
+mod parsers;
 
 use self::models::{Todo, NewTodo};
 
@@ -54,31 +55,6 @@ struct Northship {
 }
 
 impl Northship {
-    /*   fn parse_todo(&self, cmd: Vec<String>) -> Result<String, Error> {
-        /*        let tokens = cmd.split_whitespace();
-        let deadpos = tokens.position(|&word| word == "DEADLINE");
-        let schedpos = tokens.position(|&word| word == "SCHEDULED");
-
-        //        let content = tokens.take_while(|&word| word != "DEADLINE" && word != "SCHEDULED").skip(1).collect::<Vec<&str>>().join(" ");
-        //        let deadline = tokens.skip(content.len() + 1).take_while(|&word| word != "SCHEDULED").collection::<Vec<&str>>().join(" ");
-        */
-        Err(ruma_client::Error::AuthenticationRequired)
-    }
-
-    fn parse_cmd(&self, input: String) -> Result<String, Error> {
-        let words = input.split_whitespace();
-        //let matches = words.iter().matches(words.nth(0));
-
-        match words.nth(0).unwrap() {
-            "todo" | "TODO" => self.parse_todo(words.collect()),
-            //            "done" => self.mark_done(matches),
-            "deadline" => self.set_deadline(words.collect()),
-            "schedule" => self.set_schedule(words.collect()),
-            "list" => Ok(self.format_todos()),
-            "agenda" => self.format_agenda(),
-        }
-    }
-    */
 
     fn format_todos(&self) -> Result<String, Error> {
         use schema::todos::dsl::*;
@@ -102,37 +78,37 @@ impl Northship {
 
         let mut formatted_results: String = String::new();
         formatted_results.push_str(&format!("| #|{todo_title: ^widtha$}|{dead_title: ^widthb$}|{sched_title: \
-                                ^widthc$}|{eff_title:^4}|\n|{rule:-<widthd$}|\n",
-                               todo_title = "TODOs",
-                               widtha = maxes[0] + 2,
-                               dead_title = "Deadline",
-                               widthb = maxes[1] + 2,
-                               sched_title = "Scheduled",
-                               widthc = maxes[2] + 2,
-                               eff_title = "Effort",
-                               rule = "",
-                               widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
+                                        ^widthc$}|{eff_title:^4}|\n|{rule:-<widthd$}|\n",
+                                        todo_title = "TODOs",
+                                        widtha = maxes[0] + 2,
+                                        dead_title = "Deadline",
+                                        widthb = maxes[1] + 2,
+                                        sched_title = "Scheduled",
+                                        widthc = maxes[2] + 2,
+                                        eff_title = "Effort",
+                                        rule = "",
+                                        widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
         for (index, todo) in results.iter().enumerate() {
             formatted_results.push_str(&format!("|{number:>2}|{the_todo: ^widtha$}|{dead: ^widthb$}|{sched: ^widthc$}|{eff:>6}|\n|{rule:-<widthd$}|\n",
-                                            number = &(index + 1).to_string(),
-                                            the_todo = &todo.content,
-                                            widtha = maxes[0] + 2,
-                                            dead = match &todo.deadline {
-                                                &Some(ref duedate) => &duedate,
-                                                &None => "          ",
-                                            },
-                                            widthb = maxes[1] + 2,
-                                            sched = match &todo.scheduled {
-                                                &Some(ref scheddate) => &scheddate,
-                                                &None => "                   ",
-                                            },
-                                            widthc = maxes[2] + 2,
-                                            eff = match &todo.effort {
-                                                &Some(ref minutes) => minutes.to_string(),
-                                                &None => "   ".to_string(),
-                                            },
-                                            rule = "",
-                                            widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
+                                                number = &(index + 1).to_string(),
+                                                the_todo = &todo.content,
+                                                widtha = maxes[0] + 2,
+                                                dead = match &todo.deadline {
+                                                    &Some(ref duedate) => &duedate,
+                                                    &None => "          ",
+                                                },
+                                                widthb = maxes[1] + 2,
+                                                sched = match &todo.scheduled {
+                                                    &Some(ref scheddate) => &scheddate,
+                                                    &None => "                   ",
+                                                },
+                                                widthc = maxes[2] + 2,
+                                                eff = match &todo.effort {
+                                                    &Some(ref minutes) => minutes.to_string(),
+                                                    &None => "   ".to_string(),
+                                                },
+                                                rule = "",
+                                                widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
         }
         Ok(formatted_results)
     }
@@ -164,73 +140,73 @@ impl Northship {
                 scheduled: Option<&str>,
                 effort: Option<i32>,
                 room: String)
-                -> Result<(), Error> {
-        use schema::todos;
+        -> Result<(), Error> {
+            use schema::todos;
 
-        let obligation = NewTodo {
-            content: &content,
-            deadline: deadline,
-            scheduled: scheduled,
-            effort: effort,
-            room: &room,
-        };
+            let obligation = NewTodo {
+                content: &content,
+                deadline: deadline,
+                scheduled: scheduled,
+                effort: effort,
+                room: &room,
+            };
 
-        diesel::insert(&obligation)
-            .into(todos::table)
-            .execute(&self.database)
-            .expect("Error saving new todo");
-        Ok(())
-    }
+            diesel::insert(&obligation)
+                .into(todos::table)
+                .execute(&self.database)
+                .expect("Error saving new todo");
+            Ok(())
+        }
 }
 
 
 /*
-fn run<'a, C: Connect>(conn: &'a Client<C>)
-                       -> impl Future<Item = (), Error = ruma_client::Error> + 'a {
-    use r0::sync::sync_events;
-    use r0::membership::join_room_by_id;
-    use r0::send::send_message_event;
-    let mut since_time: Option<String> = None;
-    loop {
-        sync_events::call(conn,
-                          sync_events::Request {
-                              filter: None,
-                              since: since_time,
-                              full_state: None,
-                              set_presence: None,
-                              timeout: None, // Should probably set a timeout...
-                          })
-            .and_then(move |response| {
-                since_time = Some(response.next_batch);
-                if response.rooms.invite.len() > 0 {
-                    for room in response.rooms.invite.keys() {
-                        join_room_by_id::call(conn,
-                                              join_room_by_id::Request {
-                                                  room_id: room.clone(),
-                                                  third_party_signed: None,
-                                              })
-                            .and_then(|response| {
-                                let msg = MessageEventContent::Text(TextMessageEventContent {
-                                    body: "Hello, I'm Northship. If you need help, just say \
-                                           `help`."
-                                        .to_owned(),
-                                    msgtype: MessageType::Text,
-                                });
-                                send_message_event::call(conn,
-                                                         send_message_event::Request {
-                                                             room_id: room.clone(),
-                                                             event_type: EventType::RoomMessage,
-                                                             txn_id: "1".to_owned(),
-                                                             data: msg,
-                                                         });
-                            });
-                    }
-                }
-            });
-    }
-    futures::done(Ok(()))
-}
-*/
+   fn run<'a, C: Connect>(conn: &'a Client<C>)
+   -> impl Future<Item = (), Error = ruma_client::Error> + 'a {
+   use r0::sync::sync_events;
+   use r0::membership::join_room_by_id;
+   use r0::send::send_message_event;
+   let mut since_time: Option<String> = None;
+   loop {
+   sync_events::call(conn,
+   sync_events::Request {
+   filter: None,
+   since: since_time,
+   full_state: None,
+   set_presence: None,
+   timeout: None, // Should probably set a timeout...
+   })
+   .and_then(move |response| {
+   since_time = Some(response.next_batch);
+   if response.rooms.invite.len() > 0 {
+   for room in response.rooms.invite.keys() {
+   join_room_by_id::call(conn,
+   join_room_by_id::Request {
+   room_id: room.clone(),
+   third_party_signed: None,
+   })
+   .and_then(|response| {
+   let msg = MessageEventContent::Text(TextMessageEventContent {
+   body: "Hello, I'm Northship. If you need help, just say \
+   `help`."
+   .to_owned(),
+   msgtype: MessageType::Text,
+   });
+   send_message_event::call(conn,
+   send_message_event::Request {
+   room_id: room.clone(),
+   event_type: EventType::RoomMessage,
+   txn_id: "1".to_owned(),
+   data: msg,
+   });
+   });
+   }
+   }
+   });
+   }
+   futures::done(Ok(()))
+   }
+   */
 
 fn main() {
     use schema::todos::dsl::*;
@@ -241,15 +217,15 @@ fn main() {
     };
 
     host.new_todo("Solve world hunger".to_string(),
-                  Some("2017-07-10"),
-                  Some("2017-07-10 20:00:00"),
-                  None,
-                  "roomids".to_string());
+    Some("2017-07-10"),
+    Some("2017-07-10 20:00:00"),
+    None,
+    "roomids".to_string());
     host.new_todo("Fix the refrigerator and dryer".to_string(),
-                  Some("2017-07-31"),
-                  None,
-                  Some(90),
-                  "roomids".to_string());
+    Some("2017-07-31"),
+    None,
+    Some(90),
+    "roomids".to_string());
 
     println!("{}", host.format_todos().unwrap());
     // let mut core = Core::new().unwrap();
