@@ -23,6 +23,7 @@ use std::convert::TryFrom;
 use std::collections::HashMap;
 use std::cmp::max;
 use std::num::ParseIntError;
+use std::io;
 
 use diesel::prelude::*;
 use diesel::sqlite;
@@ -37,6 +38,7 @@ use ruma_identifiers::RoomAliasId;
 use tokio_core::reactor::Core;
 use url::Url;
 use chrono::{DateTime, FixedOffset};
+use nom::IResult::{Done, Error as NomError};
 
 mod models;
 mod schema;
@@ -136,8 +138,8 @@ impl Northship {
 
     fn new_todo(&self,
                 content: String,
-                deadline: Option<&str>,
-                scheduled: Option<&str>,
+                deadline: Option<String>,
+                scheduled: Option<String>,
                 effort: Option<i32>,
                 room: String)
         -> Result<(), Error> {
@@ -145,8 +147,8 @@ impl Northship {
 
             let obligation = NewTodo {
                 content: &content,
-                deadline: deadline,
-                scheduled: scheduled,
+                deadline: deadline.as_ref().map_or(None, |x| Some(&**x)),
+                scheduled: scheduled.as_ref().map_or(None, |x| Some(&**x)),
                 effort: effort,
                 room: &room,
             };
@@ -215,18 +217,25 @@ fn main() {
         database: dbc,
         mapping: vec![0, 0],
     };
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    let input_parsed = parsers::command(&input);
 
-    host.new_todo("Solve world hunger".to_string(),
-    Some("2017-07-10"),
-    Some("2017-07-10 20:00:00"),
-    None,
-    "roomids".to_string());
-    host.new_todo("Fix the refrigerator and dryer".to_string(),
-    Some("2017-07-31"),
-    None,
-    Some(90),
-    "roomids".to_string());
-
+    println!("{:?}", input_parsed);
+    match input_parsed {
+        Done(_, result) => {
+            match result {
+                parsers::Command::Todo(todo) => {
+                    println!("{:?}", &todo.body);
+                    host.new_todo(todo.body, todo.deadline, todo.scheduled, None, "rooids".to_string());
+                }
+            };
+        },
+        NomError(_) => {
+            println!("Sorry, I didn't catch that. Try again?")
+        },
+        _ => {}
+    }
     println!("{}", host.format_todos().unwrap());
     // let mut core = Core::new().unwrap();
     // let handle = core.handle();
