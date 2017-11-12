@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Ross Schulman <ross@rbs.io>"]
 
 [dependencies]
-erde = "1.0.2"
+serde = "1.0.2"
 serde_json = "1.0.1"
 serde_urlencoded = "0.4.3"
 diesel = { version = "0.13.0", features = ["sqlite"] }

@@ -41,7 +41,7 @@ struct Northship {
 
 impl Northship {
 
-    fn format_todos(&self) -> Result<String, Error> {
+    fn format_todos(&self) -> Result<String, diesel::result::Error> {
         use schema::todos::dsl::*;
         let results = todos.filter(room.eq("roomids"))
             .limit(20)
@@ -125,7 +125,7 @@ impl Northship {
                 scheduled: Option<String>,
                 effort: Option<i32>,
                 room: String)
-        -> Result<(), Error> {
+        -> Result<(), diesel::result::Error> {
             use schema::todos;
 
             let obligation = NewTodo {
