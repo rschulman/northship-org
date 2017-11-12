@@ -25,17 +25,27 @@ named!(scheduled<&str, &str>, do_parse!(
         (d)
         ));
 
-named!(command<&str, Command>, do_parse!(
-        todo >>
-        c: todo_text >>
-        d: deadline >>
-        s: scheduled >>
-        (Command::Todo(TodoCmd {
-            body: c.to_string(),
-            deadline: if d == "" { None } else { Some(d.to_string()) },
-            scheduled: if s == "" { None } else { Some(s.to_string()) }
-        }))
-        ));
+named!(pub command<&str, Command>, complete!(
+        do_parse!(
+            todo >>
+            c: todo_text >>
+            d: opt!(deadline) >>
+            s: opt!(scheduled) >>
+            (Command::Todo(TodoCmd {
+                body: c.to_string(),
+                deadline: match d {
+                    Some(deadline) => Some(deadline.to_string()),
+                    None => None
+                },
+                scheduled: match s {
+                    Some(scheduled) => Some(scheduled.to_string()),
+                    None => None
+                },
+            }))
+            )));
+//pub fn command(input: &str) -> Command {
+
+
 
 #[cfg(test)]
 mod tests {
@@ -89,6 +99,26 @@ mod tests {
             body: "go to the grocery store".to_string(),
             deadline: Some("2017-08-19".to_string()),
             scheduled: Some("2017-08-18 14:30".to_string())
+        })
+        );
+    }
+    #[test]
+    fn command_only_content() {
+        assert_eq!(command("TODO apply to college").unwrap().1,
+        Command::Todo(TodoCmd {
+            body: "apply to college".to_string(),
+            deadline: None,
+            scheduled: None
+        })
+        );
+    }
+    #[test]
+    fn command_only_deadline() {
+        assert_eq!(command("TODO apply to college DEADLINE 2017-08-19").unwrap().1,
+        Command::Todo(TodoCmd {
+            body: "apply to college".to_string(),
+            deadline: Some("2017-08-19".to_string()),
+            scheduled: None
         })
         );
     }
