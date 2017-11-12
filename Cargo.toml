@@ -4,29 +4,12 @@ version = "0.1.0"
 authors = ["Ross Schulman <ross@rbs.io>"]
 
 [dependencies]
-futures = "0.1.14"
-hyper = "0.11"
-hyper-tls = "0.1.2"
-ruma-identifiers = "0.11.0"
-ruma-events = "0.9.0"
-ruma-api = "0.4.0"
-serde = "1.0.2"
+erde = "1.0.2"
 serde_json = "1.0.1"
 serde_urlencoded = "0.4.3"
-tokio-core = "0.1.6"
-url = "1.4.0"
 diesel = { version = "0.13.0", features = ["sqlite"] }
 diesel_codegen = { version = "0.13.0", features = ["sqlite"] }
 chrono = "0.4.0"
-
-
-[dependencies.ruma-client]
-git = "https://github.com/jplatte/ruma-client"
-branch = "room_id-workaround"
-
-[dependencies.ruma-client-api]
-git = "https://github.com/jplatte/ruma-client-api"
-branch = "room_id-workaround"
 
 [dependencies.nom]
 version = "^3"
