@@ -11,16 +11,12 @@ extern crate nom;
 extern crate chrono;
 
 
-use std::convert::TryFrom;
-use std::collections::HashMap;
 use std::cmp::max;
-use std::num::ParseIntError;
 use std::io;
 
 use diesel::prelude::*;
-use diesel::sqlite;
 use diesel::sqlite::SqliteConnection;
-use chrono::{DateTime, FixedOffset};
+use chrono::NaiveDateTime;
 use nom::IResult::{Done, Error as NomError};
 
 mod models;
@@ -52,11 +48,11 @@ impl Northship {
         for todo in results.iter() {
             maxes[0] = max(todo.content.len(), maxes[0]);
             match todo.deadline {
-                Some(ref item) => maxes[1] = max(item.len(), maxes[1]),
+                Some(ref item) => maxes[1] = max(item.format("%Y-%m-%d").to_string().len(), maxes[1]),
                 None => {}
             }
             match todo.scheduled {
-                Some(ref item) => maxes[2] = max(item.len(), maxes[2]),
+                Some(ref item) => maxes[2] = max(item.format("%Y-%m-%d %H:%M:%S").to_string().len(), maxes[2]),
                 None => {}
             }
         }
@@ -78,14 +74,14 @@ impl Northship {
                                                 number = &(index + 1).to_string(),
                                                 the_todo = &todo.content,
                                                 widtha = maxes[0] + 2,
-                                                dead = match &todo.deadline {
-                                                    &Some(ref duedate) => &duedate,
-                                                    &None => "          ",
+                                                dead = match todo.deadline {
+                                                    Some(ref duedate) => format!("{}", duedate.format("%Y-%m-%d")),
+                                                    None => "          ".to_string(),
                                                 },
                                                 widthb = maxes[1] + 2,
-                                                sched = match &todo.scheduled {
-                                                    &Some(ref scheddate) => &scheddate,
-                                                    &None => "                   ",
+                                                sched = match todo.scheduled {
+                                                    Some(ref scheddate) =>format!("{}", scheddate.format("%Y-%m-%d %H:%M:%S")),
+                                                    None => "                   ".to_string(),
                                                 },
                                                 widthc = maxes[2] + 2,
                                                 eff = match &todo.effort {
@@ -98,31 +94,31 @@ impl Northship {
         Ok(formatted_results)
     }
 
-    fn set_deadline(&self, cmd: Vec<String>) -> Result<(), String> {
-        use schema::todos::dsl::{todos, deadline};
+    /*    fn set_deadline(&self, cmd: Vec<String>) -> Result<(), String> {
+          use schema::todos::dsl::{todos, deadline};
 
-        let which_todo: usize = match cmd[1].parse() {
-            Ok(number) => number,
-            Err(error) => return Err("Couldn't parse.".to_owned()),
-        };
-        let db_todo = self.mapping[which_todo - 1];
-        let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
-            Ok(parsed) => parsed,
-            Err(error) => return Err("Bad date.".to_owned()),
-        };
+          let which_todo: usize = match cmd[1].parse() {
+          Ok(number) => number,
+          Err(error) => return Err("Couldn't parse.".to_owned()),
+          };
+          let db_todo = self.mapping[which_todo - 1];
+          let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
+          Ok(parsed) => parsed,
+          Err(error) => return Err("Bad date.".to_owned()),
+          };
 
-        let updated = diesel::update(todos.find(db_todo))
-            .set(deadline.eq(be_done.to_string()))
-            .execute(&self.database)
-            .expect(&format!("Unable to find todo {}", db_todo));
+          let updated = diesel::update(todos.find(db_todo))
+          .set(deadline.eq(be_done.to_string()))
+          .execute(&self.database)
+          .expect(&format!("Unable to find todo {}", db_todo));
 
-        Ok(())
-    }
-
+          Ok(())
+          }
+          */
     fn new_todo(&self,
                 content: String,
-                deadline: Option<String>,
-                scheduled: Option<String>,
+                deadline: Option<NaiveDateTime>,
+                scheduled: Option<NaiveDateTime>,
                 effort: Option<i32>,
                 room: String)
         -> Result<(), diesel::result::Error> {
@@ -130,8 +126,8 @@ impl Northship {
 
             let obligation = NewTodo {
                 content: &content,
-                deadline: deadline.as_ref().map_or(None, |x| Some(&**x)),
-                scheduled: scheduled.as_ref().map_or(None, |x| Some(&**x)),
+                deadline: deadline,
+                scheduled: scheduled,
                 effort: effort,
                 room: &room,
             };

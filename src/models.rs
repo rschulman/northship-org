@@ -1,11 +1,12 @@
 use schema::todos;
+use chrono;
 
 #[derive(Queryable)]
 pub struct Todo {
     pub id: i32,
     pub content: String,
-    pub deadline: Option<String>,
-    pub scheduled: Option<String>,
+    pub deadline: Option<chrono::NaiveDateTime>,
+    pub scheduled: Option<chrono::NaiveDateTime>,
     pub effort: Option<i32>,
     pub room: String,
 }
@@ -14,8 +15,8 @@ pub struct Todo {
 #[table_name="todos"]
 pub struct NewTodo<'a> {
     pub content: &'a str,
-    pub deadline: Option<&'a str>,
-    pub scheduled: Option<&'a str>,
+    pub deadline: Option<chrono::NaiveDateTime>,
+    pub scheduled: Option<chrono::NaiveDateTime>,
     pub effort: Option<i32>,
     pub room: &'a str,
 }
