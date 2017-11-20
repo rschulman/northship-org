@@ -13,4 +13,4 @@ chrono = "0.4.0"
 
 [dependencies.nom]
 version = "^3"
-features = ["nightly"]
+features = ["nightly", "verbose-errors"]
