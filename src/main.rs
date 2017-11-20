@@ -147,24 +147,26 @@ fn main() {
         database: dbc,
         mapping: vec![0, 0],
     };
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    let input_parsed = parsers::command(&input);
+    loop {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let input_parsed = parsers::command(&input);
 
-    println!("{:?}", input_parsed);
-    match input_parsed {
-        Done(_, result) => {
-            match result {
-                parsers::Command::Todo(todo) => {
-                    println!("{:?}", &todo.body);
-                    host.new_todo(todo.body, todo.deadline, todo.scheduled, None, "rooids".to_string());
-                }
-            };
-        },
-        NomError(_) => {
-            println!("Sorry, I didn't catch that. Try again?")
-        },
-        _ => {}
+        println!("{:?}", input_parsed);
+        match input_parsed {
+            Done(_, result) => {
+                match result {
+                    parsers::Command::Todo(todo) => {
+                        println!("{:?}", &todo.body);
+                        host.new_todo(todo.body, todo.deadline, todo.scheduled, None, "roomids".to_string());
+                    }
+                };
+            },
+            NomError(_) => {
+                println!("Sorry, I didn't catch that. Try again?")
+            },
+            _ => {}
+        }
+        println!("{}", host.format_todos().unwrap());
     }
-    println!("{}", host.format_todos().unwrap());
 }

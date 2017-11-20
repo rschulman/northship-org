@@ -28,12 +28,19 @@ named!(date<&str, NaiveDateTime>, do_parse!(
         m: digit >>
         tag_s!("-") >>
         d: digit >>
-        new_time: value!(NaiveTime::from_hms(0, 0, 0), do_parse!(
-                alt!(tag_s!("T") | tag_s!(" ")) >>
+        new_time: opt!(do_parse!(
+                alt_complete!(tag_s!("T") | tag_s!(" ")) >>
                 t: time >>
                 (t))) >>
-        (NaiveDateTime::new(NaiveDate::from_ymd(i32::from_str(y).unwrap(), u32::from_str(m).unwrap(), u32::from_str(d).unwrap()), new_time))
-        ));
+        (
+            NaiveDateTime::new(
+                NaiveDate::from_ymd(
+                    i32::from_str(y).unwrap(),
+                    u32::from_str(m).unwrap(),
+                    u32::from_str(d).unwrap()
+                    ),
+                    new_time.unwrap_or(NaiveTime::from_hms(0,0,0)))
+        )));
 named!(todo<&str, &str>, tag_no_case_s!("TODO "));
 named!(todo_text<&str, &str>, alt_complete!(take_until_s!(" DEADLINE") | take_until_s!(" SCHEDULED") | rest_s));
 named!(deadline<&str, NaiveDateTime>, do_parse!(
@@ -47,20 +54,19 @@ named!(scheduled<&str, NaiveDateTime>, do_parse!(
         (d)
         ));
 
-named!(pub command<&str, Command>, complete!(
-        do_parse!(
-            todo >>
-            c: todo_text >>
-            d: opt!(deadline) >>
-            s: opt!(scheduled) >>
-            (Command::Todo(TodoCmd {
-                body: c.to_string(),
-                deadline: d,
-                scheduled: s,
-            },
-            ))
-            )));
-
+named!(pub command<&str, Command>,
+       do_parse!(
+           todo >>
+           c: todo_text >>
+           d: opt!(complete!(deadline)) >>
+           s: opt!(complete!(scheduled)) >>
+           (Command::Todo(TodoCmd {
+               body: c.to_string(),
+               deadline: d,
+               scheduled: s,
+           },
+           ))
+           ));
 
 
 #[cfg(test)]
@@ -71,6 +77,10 @@ mod tests {
     #[test]
     fn date_no_time() {
         assert_eq!(date("2017-4-23"), IResult::Done("", NaiveDate::from_ymd(2017, 4, 23).and_hms(0, 0, 0)));
+    }
+    #[test]
+    fn date_and_time() {
+        assert_eq!(date("2017-4-23 16:00:45"), IResult::Done("", NaiveDate::from_ymd(2017, 4, 23).and_hms(16, 0, 45)));
     }
     #[test]
     fn find_todo() {
@@ -97,11 +107,13 @@ mod tests {
         assert_eq!(todo_text("go home"),
         IResult::Done("", "go home"));
     }
-    #[test]
-    fn find_deadline_text_scheduled() {
-        assert_eq!(deadline(" DEADLINE 2017-6-8 SCHEDULED today"),
-        IResult::Done(" SCHEDULED today", NaiveDate::from_ymd(2017, 6, 8).and_hms(0, 0, 0)));
-    }
+    /* Leaving fuzzy date parsing for later
+       #[test]
+       fn find_deadline_text_scheduled() {
+       assert_eq!(deadline(" DEADLINE 2017-6-8 SCHEDULED today"),
+       IResult::Done(" SCHEDULED today", NaiveDate::from_ymd(2017, 6, 8).and_hms(0, 0, 0)));
+       }
+       */
     #[test]
     fn find_deadline_text_no_scheduled() {
         assert_eq!(deadline(" DEADLINE 2017-6-8"),
@@ -116,32 +128,32 @@ mod tests {
          */
     #[test]
     fn command_todo() {
-        assert_eq!(command("TODO go to the grocery store DEADLINE 2017-08-19 SCHEDULED 2017-08-18 14:30").unwrap().1,
-        Command::Todo(TodoCmd {
+        assert_eq!(command("TODO go to the grocery store DEADLINE 2017-08-19 SCHEDULED 2017-08-18 14:30"),
+        IResult::Done("", Command::Todo(TodoCmd {
             body: "go to the grocery store".to_string(),
             deadline: Some(NaiveDate::from_ymd(2017, 8, 19).and_hms(0, 0, 0)),
             scheduled: Some(NaiveDate::from_ymd(2017, 8, 18).and_hms(14, 30, 0))
-        })
+        }))
         );
     }
     #[test]
     fn command_only_content() {
-        assert_eq!(command("TODO apply to college").unwrap().1,
-        Command::Todo(TodoCmd {
+        assert_eq!(command("TODO apply to college"),
+        IResult::Done("", Command::Todo(TodoCmd {
             body: "apply to college".to_string(),
             deadline: None,
             scheduled: None
-        })
+        }))
         );
     }
     #[test]
     fn command_only_deadline() {
-        assert_eq!(command("TODO apply to college DEADLINE 2017-08-19").unwrap().1,
-        Command::Todo(TodoCmd {
+        assert_eq!(command("TODO apply to college DEADLINE 2017-08-19"),
+        IResult::Done("", Command::Todo(TodoCmd {
             body: "apply to college".to_string(),
             deadline: Some(NaiveDate::from_ymd(2017, 8, 19).and_hms(0, 0, 0)),
             scheduled: None
-        })
+        }))
         );
     }
 
