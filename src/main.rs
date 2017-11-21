@@ -36,7 +36,6 @@ struct Northship {
 }
 
 impl Northship {
-
     fn format_todos(&self) -> Result<String, diesel::result::Error> {
         use schema::todos::dsl::*;
         let results = todos.filter(room.eq("roomids"))
@@ -48,11 +47,15 @@ impl Northship {
         for todo in results.iter() {
             maxes[0] = max(todo.content.len(), maxes[0]);
             match todo.deadline {
-                Some(ref item) => maxes[1] = max(item.format("%Y-%m-%d").to_string().len(), maxes[1]),
+                Some(ref item) => {
+                    maxes[1] = max(item.format("%Y-%m-%d").to_string().len(), maxes[1])
+                }
                 None => {}
             }
             match todo.scheduled {
-                Some(ref item) => maxes[2] = max(item.format("%Y-%m-%d %H:%M:%S").to_string().len(), maxes[2]),
+                Some(ref item) => {
+                    maxes[2] = max(item.format("%Y-%m-%d %H:%M:%S").to_string().len(), maxes[2])
+                }
                 None => {}
             }
         }
@@ -121,23 +124,23 @@ impl Northship {
                 scheduled: Option<NaiveDateTime>,
                 effort: Option<i32>,
                 room: String)
-        -> Result<(), diesel::result::Error> {
-            use schema::todos;
+                -> Result<(), diesel::result::Error> {
+        use schema::todos;
 
-            let obligation = NewTodo {
-                content: &content,
-                deadline: deadline,
-                scheduled: scheduled,
-                effort: effort,
-                room: &room,
-            };
+        let obligation = NewTodo {
+            content: &content,
+            deadline: deadline,
+            scheduled: scheduled,
+            effort: effort,
+            room: &room,
+        };
 
-            diesel::insert(&obligation)
-                .into(todos::table)
-                .execute(&self.database)
-                .expect("Error saving new todo");
-            Ok(())
-        }
+        diesel::insert(&obligation)
+            .into(todos::table)
+            .execute(&self.database)
+            .expect("Error saving new todo");
+        Ok(())
+    }
 }
 
 fn main() {
@@ -154,20 +157,22 @@ fn main() {
 
         println!("{:?}", input_parsed);
         match input_parsed {
-            Done(_, result) => {
+            Some(result) => {
                 match result {
                     parsers::Command::Todo(todo) => {
                         println!("{:?}", &todo.body);
-                        host.new_todo(todo.body, todo.deadline, todo.scheduled, None, "roomids".to_string());
+                        host.new_todo(todo.body,
+                                      todo.deadline,
+                                      todo.scheduled,
+                                      None,
+                                      "roomids".to_string());
                     }
                     parsers::Command::Agenda => {
                         host.format_todos().unwrap();
                     }
                 };
-            },
-            NomError(_) => {
-                println!("Sorry, I didn't catch that. Try again?")
-            },
+            }
+            None => println!("Sorry, I didn't catch that. Try again?"),
             _ => {}
         }
         println!("{}", host.format_todos().unwrap());
