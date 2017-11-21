@@ -42,7 +42,7 @@ impl Northship {
             .load::<Todo>(&self.database)
             .expect("Error loading Todos");
 
-        let mut maxes = vec![0, 0, 0];
+        let mut maxes = vec![0, "Deadline".len(), "Scheduled".len()];
         for todo in results.iter() {
             maxes[0] = max(todo.content.len(), maxes[0]);
             match todo.deadline {
@@ -78,17 +78,17 @@ impl Northship {
                                                 widtha = maxes[0] + 2,
                                                 dead = match todo.deadline {
                                                     Some(ref duedate) => format!("{}", duedate.format("%Y-%m-%d")),
-                                                    None => "          ".to_string(),
+                                                    None => "".to_string(),
                                                 },
                                                 widthb = maxes[1] + 2,
                                                 sched = match todo.scheduled {
                                                     Some(ref scheddate) =>format!("{}", scheddate.format("%Y-%m-%d %H:%M:%S")),
-                                                    None => "                   ".to_string(),
+                                                    None => "".to_string(),
                                                 },
                                                 widthc = maxes[2] + 2,
                                                 eff = match &todo.effort {
                                                     &Some(ref minutes) => minutes.to_string(),
-                                                    &None => "   ".to_string(),
+                                                    &None => "  ".to_string(),
                                                 },
                                                 rule = "",
                                                 widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
