@@ -5,6 +5,7 @@ use chrono::{ NaiveDate, NaiveDateTime, NaiveTime };
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Todo(TodoCmd),
+    Agenda,
 }
 
 #[derive(Debug, PartialEq)]
@@ -74,6 +75,10 @@ mod tests {
     use nom::*;
     use super::*;
 
+    #[test]
+    fn agenda() {
+        assert_eq!(command("AGENDA"), IResult::Done("", Command::Agenda));
+    }
     #[test]
     fn date_no_time() {
         assert_eq!(date("2017-4-23"), IResult::Done("", NaiveDate::from_ymd(2017, 4, 23).and_hms(0, 0, 0)));

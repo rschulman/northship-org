@@ -160,6 +160,9 @@ fn main() {
                         println!("{:?}", &todo.body);
                         host.new_todo(todo.body, todo.deadline, todo.scheduled, None, "roomids".to_string());
                     }
+                    parsers::Command::Agenda => {
+                        host.format_todos().unwrap();
+                    }
                 };
             },
             NomError(_) => {
