@@ -17,7 +17,6 @@ use std::io;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use chrono::NaiveDateTime;
-use nom::IResult::{Done, Error as NomError};
 
 mod models;
 mod schema;
@@ -97,27 +96,6 @@ impl Northship {
         Ok(formatted_results)
     }
 
-    /*    fn set_deadline(&self, cmd: Vec<String>) -> Result<(), String> {
-          use schema::todos::dsl::{todos, deadline};
-
-          let which_todo: usize = match cmd[1].parse() {
-          Ok(number) => number,
-          Err(error) => return Err("Couldn't parse.".to_owned()),
-          };
-          let db_todo = self.mapping[which_todo - 1];
-          let be_done = match cmd[2].parse::<DateTime<FixedOffset>>() {
-          Ok(parsed) => parsed,
-          Err(error) => return Err("Bad date.".to_owned()),
-          };
-
-          let updated = diesel::update(todos.find(db_todo))
-          .set(deadline.eq(be_done.to_string()))
-          .execute(&self.database)
-          .expect(&format!("Unable to find todo {}", db_todo));
-
-          Ok(())
-          }
-          */
     fn new_todo(&self,
                 content: String,
                 deadline: Option<NaiveDateTime>,
@@ -155,24 +133,23 @@ fn main() {
         io::stdin().read_line(&mut input).unwrap();
         let input_parsed = parsers::command(&input);
 
-        println!("{:?}", input_parsed);
         match input_parsed {
             Some(result) => {
                 match result {
                     parsers::Command::Todo(todo) => {
-                        host.new_todo(todo.body,
-                                      todo.deadline,
-                                      todo.scheduled,
-                                      None,
-                                      "roomids".to_string());
+                        match host.new_todo(todo.body,
+                                            todo.deadline,
+                                            todo.scheduled,
+                                            None,
+                                            "roomids".to_string()) {
+                            Ok(()) => println!("New TODO added..."),
+                            Err(_) => println!("Error: Couldn't insert TODO in the database."),
+                        }
                     }
-                    parsers::Command::Agenda => {
-                        host.format_todos().unwrap();
-                    }
+                    parsers::Command::Agenda => println!("{}", host.format_todos().unwrap()),
                 };
             }
             None => println!("Sorry, I didn't catch that. Try again?"),
-            _ => {}
         }
     }
 }
