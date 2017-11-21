@@ -61,7 +61,7 @@ named!(todo_cmd<&str, Command>,
            d: opt!(complete!(deadline)) >>
            s: opt!(complete!(scheduled)) >>
            (Command::Todo(TodoCmd {
-               body: c.to_string(),
+               body: c.trim_right().to_string(),
                deadline: d,
                scheduled: s,
            } ))
