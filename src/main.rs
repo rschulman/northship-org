@@ -160,7 +160,6 @@ fn main() {
             Some(result) => {
                 match result {
                     parsers::Command::Todo(todo) => {
-                        println!("{:?}", &todo.body);
                         host.new_todo(todo.body,
                                       todo.deadline,
                                       todo.scheduled,
@@ -175,6 +174,5 @@ fn main() {
             None => println!("Sorry, I didn't catch that. Try again?"),
             _ => {}
         }
-        println!("{}", host.format_todos().unwrap());
     }
 }
