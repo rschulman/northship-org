@@ -4,13 +4,46 @@ version = "0.1.0"
 authors = ["Ross Schulman <ross@rbs.io>"]
 
 [dependencies]
-serde = "1.0.2"
-serde_json = "1.0.1"
-serde_urlencoded = "0.4.3"
 diesel = { version = "*", features = ["sqlite", "chrono"] }
 diesel_codegen = { version = "0.13.0", features = ["sqlite"] }
 chrono = "0.4.0"
+futures = "0.1.14"
+futures-await = "0.1"
+hyper = "0.11.1"
+ruma-api = "0.4.0"
+serde_json = "1.0.2"
+serde_urlencoded = "0.5.1"
+tokio-core = "0.1.8"
+url = "1.5.1"
 
 [dependencies.nom]
 version = "^3"
 features = ["nightly", "verbose-errors"]
+
+[dependencies.hyper-tls]
+optional = true
+version = "0.1.2"
+
+[dependencies.native-tls]
+optional = true
+version = "0.1.4"
+
+[dependencies.ruma-client]
+git = "https://github.com/jplatte/ruma-client"
+branch = "synapse-workarounds"
+
+[dependencies.ruma-client-api]
+git = "https://github.com/jplatte/ruma-client-api"
+branch = "synapse-workarounds"
+
+[dependencies.ruma-identifiers]
+git = "https://github.com/jplatte/ruma-identifiers"
+branch = "synapse-workarounds"
+
+[dependencies.ruma-events]
+git = "https://github.com/jplatte/ruma-events"
+branch = "synapse-workarounds"
+
+[features]
+default = ["tls"]
+tls = ["hyper-tls", "native-tls"]

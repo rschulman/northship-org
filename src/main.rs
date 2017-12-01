@@ -1,6 +1,7 @@
-
-#![feature(try_from)]
 #![feature(conservative_impl_trait)]
+#![feature(generators)]
+#![feature(proc_macro)]
+#![feature(try_from)]
 
 #[macro_use]
 extern crate diesel;
@@ -9,20 +10,60 @@ extern crate diesel_codegen;
 #[macro_use]
 extern crate nom;
 extern crate chrono;
-
+//extern crate futures;
+extern crate ruma_client;
+extern crate ruma_events;
+extern crate ruma_identifiers;
+extern crate tokio_core;
+extern crate url;
+extern crate futures_await as futures;
+extern crate hyper;
 
 use std::cmp::max;
 use std::io;
+use std::convert::TryFrom;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+
 use chrono::NaiveDateTime;
+
+use futures::prelude::*;
+use ruma_client::api::r0;
+use ruma_client::Client;
+use ruma_events::EventType;
+use ruma_events::collections::all::RoomEvent;
+use ruma_events::room::message::{MessageType, MessageEvent, MessageEventContent,
+                                 TextMessageEventContent};
+use ruma_identifiers::{RoomAliasId, RoomId};
+use tokio_core::reactor::{Core as TokioCore, Handle as TokioHandle};
+use url::Url;
+use hyper::client::Connect;
 
 mod models;
 mod schema;
 mod parsers;
 
 use self::models::{Todo, NewTodo};
+
+// from https://stackoverflow.com/a/43992218/1592377
+#[macro_export]
+macro_rules! clone {
+    (@param _) => ( _ );
+    (@param $x:ident) => ( $x );
+    ($($n:ident),+ => move || $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+                move || $body
+        }
+        );
+    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+                move |$(clone!(@param $p),)+| $body
+        }
+        );
+}
 
 fn db_connect() -> SqliteConnection {
     let db_url = "/home/ross/.config/northship/northship.db";
@@ -34,7 +75,119 @@ struct Northship {
     mapping: Vec<i32>,
 }
 
+/*fn send_matrix_message<C: Connect>
+  (client: ruma_client::Client<C>,
+  message: String,
+  room: RoomId)
+  -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+
+  }*/
+
 impl Northship {
+    fn matrix_loop(&self,
+                   tokio_handle: &TokioHandle,
+                   homeserver_url: Url,
+                   username: String,
+                   password: String)
+                   -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+        let client = ruma_client::Client::https(tokio_handle, homeserver_url, None).unwrap();
+
+        client.log_in(username, password).and_then(
+            clone!(client => move |_| {
+        client.sync(None, None, true).skip(1).for_each(|res| {
+                for (room_id, room) in res.rooms.join {
+                    for event in room.timeline.events {
+                        if let RoomEvent::RoomMessage(MessageEvent {
+                            content: MessageEventContent::Text(
+                                         TextMessageEventContent {
+                                             body: msg_body,
+                                             ..
+                                         }
+                                         ),
+                                         user_id,
+                                         ..
+                        }) = event {
+                            let input_parsed = parsers::command(&msg_body);
+                            match input_parsed {
+                                Some(result) => {
+                                    match result {
+                                        parsers::Command::Todo(todo) => {
+                                            match self.new_todo(todo.body,
+                                                                todo.deadline,
+                                                                todo.scheduled,
+                                                                None,
+                                                                room_id.to_string()) {
+                                                Ok(()) => { 
+                                                    r0::send::send_message_event::call(client.clone(),
+                                                r0::send::send_message_event::Request {
+                                                    room_id: room_id,
+                                                    event_type: EventType::RoomMessage,
+                                                    txn_id: "1".to_owned(), // TODO Probably problematic
+                                                    data:
+                                                        MessageEventContent::Text(TextMessageEventContent {
+                                                            body: "New TODO added".to_owned(),
+                                                            msgtype: MessageType::Text,
+                                                        }),
+                                                });
+                                                },
+                                                Err(_) => {
+                                                    r0::send::send_message_event::call(client.clone(),
+                                                r0::send::send_message_event::Request {
+                                                    room_id: room_id,
+                                                    event_type: EventType::RoomMessage,
+                                                    txn_id: "1".to_owned(), // TODO Probably problematic
+                                                    data:
+                                                        MessageEventContent::Text(TextMessageEventContent {
+                                                            body: "Error adding TODO to datbaase.".to_owned(),
+                                                            msgtype: MessageType::Text,
+                                                        }),
+                                                });
+                                                },
+
+
+
+                                            };
+                                        },
+                                        parsers::Command::Agenda => {
+                                            r0::send::send_message_event::call(client.clone(),
+                                            r0::send::send_message_event::Request {
+                                                room_id: room_id,
+                                                event_type: EventType::RoomMessage,
+                                                txn_id: "1".to_owned(), // TODO Probably problematic
+                                                data:
+                                                    MessageEventContent::Text(TextMessageEventContent {
+                                                        body: self.format_todos().unwrap().to_owned(),
+                                                        msgtype: MessageType::Text,
+                                                    }),
+                                            });
+                                        },
+                                    };
+                                },
+                                None => {
+                                    r0::send::send_message_event::call(client.clone(),
+                                r0::send::send_message_event::Request {
+                                    room_id: room_id,
+                                    event_type: EventType::RoomMessage,
+                                    txn_id: "1".to_owned(), // TODO Probably problematic
+                                    data:
+                                        MessageEventContent::Text(TextMessageEventContent {
+                                            body: "Sorry, I didn't catch that. Try again?".to_owned(),
+                                            msgtype: MessageType::Text,
+                                        }),
+                                });
+                                },
+
+                            };
+                        }
+                    }
+
+                }
+        Ok(())
+            })
+            }),
+        )
+    }
+
     fn format_todos(&self) -> Result<String, diesel::result::Error> {
         use schema::todos::dsl::*;
         let results = todos.filter(room.eq("roomids"))
@@ -61,16 +214,16 @@ impl Northship {
 
         let mut formatted_results: String = String::new();
         formatted_results.push_str(&format!("| #|{todo_title: ^widtha$}|{dead_title: ^widthb$}|{sched_title: \
-                                        ^widthc$}|{eff_title:^4}|\n|{rule:-<widthd$}|\n",
-                                        todo_title = "TODOs",
-                                        widtha = maxes[0] + 2,
-                                        dead_title = "Deadline",
-                                        widthb = maxes[1] + 2,
-                                        sched_title = "Scheduled",
-                                        widthc = maxes[2] + 2,
-                                        eff_title = "Effort",
-                                        rule = "",
-                                        widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
+                                                    ^widthc$}|{eff_title:^4}|\n|{rule:-<widthd$}|\n",
+                                                    todo_title = "TODOs",
+                                                    widtha = maxes[0] + 2,
+                                                    dead_title = "Deadline",
+                                                    widthb = maxes[1] + 2,
+                                                    sched_title = "Scheduled",
+                                                    widthc = maxes[2] + 2,
+                                                    eff_title = "Effort",
+                                                    rule = "",
+                                                    widthd = 12 + 6 + maxes[0] + maxes[1] + maxes[2]));
         for (index, todo) in results.iter().enumerate() {
             formatted_results.push_str(&format!("|{number:>2}|{the_todo: ^widtha$}|{dead: ^widthb$}|{sched: ^widthc$}|{eff:>6}|\n|{rule:-<widthd$}|\n",
                                                 number = &(index + 1).to_string(),
