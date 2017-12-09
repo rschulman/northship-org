@@ -5,7 +5,8 @@ authors = ["Ross Schulman <ross@rbs.io>"]
 
 [dependencies]
 diesel = { version = "*", features = ["sqlite", "chrono"] }
-diesel_codegen = { version = "0.13.0", features = ["sqlite"] }
+#diesel_codegen = { version = "0.13.0", features = ["sqlite"] }
+diesel_infer_schema = { version = "1.0.0-beta1", features = ["sqlite"] }
 chrono = "0.4.0"
 futures = "0.1.14"
 futures-await = "0.1"
